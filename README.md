@@ -91,7 +91,10 @@ Nothing else in the codebase branches on it.
    info windows, and cooperative gesture handling so a full-width map never hijacks page scroll
    on a phone.
 2. **Mapbox GL** — when `NEXT_PUBLIC_MAPBOX_TOKEN` is set and Google is not.
-3. **A schematic plot** of the same coordinates, so the page never shows an empty grey box.
+3. **MapLibre GL with OpenStreetMap tiles** — the default when no key is set. Tiles come from
+   [OpenFreeMap](https://openfreemap.org), which needs no key or account, so the live map works
+   on a fresh deployment.
+4. **A schematic plot** of the same coordinates, if even that cannot load (e.g. no WebGL).
 
 Advanced markers require a Map ID. `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` is used when set; otherwise
 Google's built-in sample Map ID is used, which is fine for development but should be replaced

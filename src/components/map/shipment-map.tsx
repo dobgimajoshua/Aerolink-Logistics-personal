@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { GoogleShipmentMap } from "./google-shipment-map";
+import { OpenShipmentMap } from "./open-shipment-map";
 import { googleMapsKey } from "@/lib/maps/google-loader";
 import {
   MARKER_COLORS,
   MARKER_ICONS,
   MARKER_LABELS,
+  escapeHtml,
   pointAtProgress,
   type CargoOnRoute,
   type MapPoint,
@@ -33,7 +35,8 @@ interface ShipmentMapProps {
  *
  *   1. Google Maps  — when NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is set
  *   2. Mapbox GL    — when NEXT_PUBLIC_MAPBOX_TOKEN is set
- *   3. A schematic plot of the same coordinates
+ *   3. MapLibre GL  — OpenStreetMap tiles, no key needed
+ *   4. A schematic plot of the same coordinates
  *
  * Each provider degrades to the next if it fails at runtime, so the page is
  * never left with an empty grey box.
@@ -49,9 +52,11 @@ export function ShipmentMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   const [googleFailed, setGoogleFailed] = useState(false);
+  const [openFailed, setOpenFailed] = useState(false);
 
   const useGoogle = Boolean(googleMapsKey()) && !googleFailed && points.length > 0;
   const onGoogleFailure = useCallback(() => setGoogleFailed(true), []);
+  const onOpenFailure = useCallback(() => setOpenFailed(true), []);
 
   useEffect(() => {
     if (useGoogle || !token || !containerRef.current || points.length === 0) return;
@@ -157,6 +162,19 @@ export function ShipmentMap({
     );
   }
 
+  if ((!token || failed) && !openFailed && points.length > 0) {
+    return (
+      <OpenShipmentMap
+        points={points}
+        className={className}
+        heightClassName={heightClassName}
+        connect={connect}
+        cargo={cargo}
+        onFailure={onOpenFailure}
+      />
+    );
+  }
+
   if (!token || failed || points.length === 0) {
     return (
       <SchematicMap
@@ -185,12 +203,6 @@ function bounds(points: MapPoint[]): [[number, number], [number, number]] {
     [Math.min(...lngs), Math.min(...lats)],
     [Math.max(...lngs), Math.max(...lats)],
   ];
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -397,7 +409,7 @@ function SchematicMap({
 
       <p className="absolute bottom-2.5 right-3 inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[0.6875rem] font-semibold text-ink-300 backdrop-blur">
         <Info aria-hidden className="size-3" />
-        Schematic view — add a Google Maps or Mapbox key for the live map
+        Schematic view — the live map could not load
       </p>
     </div>
   );

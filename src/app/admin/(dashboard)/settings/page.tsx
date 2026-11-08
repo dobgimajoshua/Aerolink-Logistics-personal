@@ -101,7 +101,7 @@ export default async function AdminSettingsPage() {
                   ? google
                     ? "Configured, but Google Maps takes priority."
                     : "Shipment maps render as interactive Mapbox maps."
-                  : "Optional fallback. Without any map key a schematic route plot is shown."
+                  : "Optional. Without any map key, live maps use free OpenStreetMap tiles."
               }
             />
           </ul>

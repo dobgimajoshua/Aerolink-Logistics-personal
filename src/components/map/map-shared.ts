@@ -137,3 +137,22 @@ export function pointAtProgress(
 
   return points[points.length - 1];
 }
+
+const PULSE_STYLE_ID = "freightcargoxpress-marker-pulse";
+
+/** Injects the marker pulse animation once per page, for DOM-built markers. */
+export function ensurePulseKeyframes() {
+  if (document.getElementById(PULSE_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = PULSE_STYLE_ID;
+  style.textContent = `@keyframes freightcargoxpress-pulse{0%{box-shadow:0 0 0 0 rgba(251,92,17,.55)}70%{box-shadow:0 0 0 16px rgba(251,92,17,0)}100%{box-shadow:0 0 0 0 rgba(251,92,17,0)}}`;
+  document.head.appendChild(style);
+}
+
+/** For labels interpolated into popup HTML. */
+export function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
+}

@@ -7,6 +7,8 @@ import {
   MARKER_COLORS,
   MARKER_LABELS,
   cargoMarkerElement,
+  ensurePulseKeyframes,
+  escapeHtml,
   pointAtProgress,
   type CargoOnRoute,
   type MapPoint,
@@ -21,16 +23,6 @@ interface Props {
   connect?: boolean;
   /** Called when Google fails, so the caller can fall back to another map. */
   onFailure?: () => void;
-}
-
-const PULSE_STYLE_ID = "freightcargoxpress-marker-pulse";
-
-function ensurePulseKeyframes() {
-  if (document.getElementById(PULSE_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = PULSE_STYLE_ID;
-  style.textContent = `@keyframes freightcargoxpress-pulse{0%{box-shadow:0 0 0 0 rgba(251,92,17,.55)}70%{box-shadow:0 0 0 16px rgba(251,92,17,0)}100%{box-shadow:0 0 0 0 rgba(251,92,17,0)}}`;
-  document.head.appendChild(style);
 }
 
 /** Builds the DOM element used as an advanced-marker's content. */
@@ -50,13 +42,6 @@ function markerElement(point: MapPoint): HTMLElement {
     .filter(Boolean)
     .join(";");
   return wrapper;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
 }
 
 /**
@@ -191,7 +176,12 @@ export function GoogleShipmentMap({
           const positionNow = () =>
             (cargo.status === "delivered"
               ? 1
-              : travelledProgressFromScans(cargo.scans, cargo.routeKm, cargo.cargoType)) ??
+              : travelledProgressFromScans(
+                    cargo.scans,
+                    cargo.routeKm,
+                    cargo.cargoType,
+                    cargo.status,
+                  )) ??
             timeProgress(cargo.shipDate, cargo.deliveryDate) ??
             cargo.progress;
 
