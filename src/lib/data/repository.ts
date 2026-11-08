@@ -79,8 +79,12 @@ export async function getShipmentByTracking(
 function sortEvents(shipment: ShipmentWithEvents): ShipmentWithEvents {
   return {
     ...shipment,
+    // Newest first. Scans stamped at the same instant fall back to the order
+    // they were recorded in, so the latest change is never the one buried.
     tracking_events: [...(shipment.tracking_events ?? [])].sort(
-      (a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime(),
+      (a, b) =>
+        new Date(b.event_date).getTime() - new Date(a.event_date).getTime() ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     ),
   };
 }

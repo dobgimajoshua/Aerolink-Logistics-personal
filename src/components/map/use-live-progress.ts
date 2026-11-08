@@ -45,7 +45,7 @@ export function useLiveCargoProgress(cargo: CargoOnRoute | null | undefined): nu
     const positionNow = () =>
       (status === "delivered"
         ? 1
-        : travelledProgressFromScans(scans ?? [], routeKm, cargoType)) ??
+        : travelledProgressFromScans(scans ?? [], routeKm, cargoType, status)) ??
       timeProgress(shipDate, deliveryDate) ??
       fallback;
 

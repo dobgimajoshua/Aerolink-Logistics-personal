@@ -43,12 +43,13 @@ export function TrackingEventForm({ shipmentId, currentStatus, currentLocation }
   const [formError, setFormError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Local wall-clock time, formatted for a datetime-local input.
-  const nowLocal = (() => {
+  // Local wall-clock time, formatted for a datetime-local input. Fixed at
+  // mount so it still matches the input's default after a re-render.
+  const [nowLocal] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 16);
-  })();
+  });
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -70,7 +71,16 @@ export function TrackingEventForm({ shipmentId, currentStatus, currentLocation }
           latitude: raw.latitude ? Number(raw.latitude) : null,
           longitude: raw.longitude ? Number(raw.longitude) : null,
           description: raw.description,
-          event_date: new Date(raw.event_date).toISOString(),
+          /*
+           * The input only holds minutes. Left at its default it means "now",
+           * so send the real instant: truncated to the minute it can land
+           * before the scan written seconds earlier when the shipment was
+           * created, and the history would then read that one as the latest.
+           */
+          event_date:
+            raw.event_date === nowLocal
+              ? new Date().toISOString()
+              : new Date(raw.event_date).toISOString(),
           sync_shipment: raw.sync_shipment === "on",
         }),
       });

@@ -188,12 +188,20 @@ export interface ScanLeg {
  * One that was never collected has no moving stretch at all, so it correctly
  * sits at the origin.
  *
+ * The stretch since the newest scan is governed by `currentStatus`, the
+ * shipment's own status, not by that scan's. The two normally agree, but a scan
+ * can be dated earlier than the one before it — a backdated entry, or one
+ * stamped to the minute just after the shipment was created — and then the
+ * newest scan by date is not the latest change. The shipment's status is, so
+ * a package put on hold stops whatever order its scans happen to sort in.
+ *
  * `scans` must be oldest first. Returns null when there is nothing to measure.
  */
 export function travelledProgressFromScans(
   scans: ScanLeg[],
   routeKm: number,
   cargoType: CargoType,
+  currentStatus: ShipmentStatus,
   now: number = Date.now(),
 ): number | null {
   if (!(routeKm > 0) || scans.length === 0) return null;
@@ -202,7 +210,8 @@ export function travelledProgressFromScans(
   let km = 0;
 
   for (let i = 0; i < scans.length; i += 1) {
-    if (!isMoving(scans[i].status)) continue;
+    const latest = i === scans.length - 1;
+    if (!isMoving(latest ? currentStatus : scans[i].status)) continue;
 
     const from = new Date(scans[i].at).getTime();
     if (Number.isNaN(from)) continue;

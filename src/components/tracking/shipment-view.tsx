@@ -90,7 +90,7 @@ export function cargoFor(shipment: ShipmentWithEvents, points: MapPoint[]): Carg
     progress:
       (shipment.status === "delivered"
         ? 1
-        : travelledProgressFromScans(scans, routeKm, cargoType)) ??
+        : travelledProgressFromScans(scans, routeKm, cargoType, shipment.status)) ??
       timeProgress(shipment.ship_date, shipment.estimated_delivery) ??
       byScan ??
       progressFor(shipment.status),
