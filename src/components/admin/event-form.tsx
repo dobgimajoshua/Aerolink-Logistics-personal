@@ -1,13 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, Radio } from "lucide-react";
 import type { ShipmentStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { STATUS_LABELS } from "@/lib/utils/format";
+import { STATUS_PREVIEW_EVENT, type StatusPreviewDetail } from "@/components/map/shipment-map";
+
+/** Shows the selected status on the page's map before the scan is posted. */
+function previewOnMap(detail: StatusPreviewDetail) {
+  window.dispatchEvent(new CustomEvent(STATUS_PREVIEW_EVENT, { detail }));
+}
 
 const STATUSES = Object.keys(STATUS_LABELS) as ShipmentStatus[];
 
@@ -42,6 +48,20 @@ export function TrackingEventForm({ shipmentId, currentStatus, currentLocation }
   const [description, setDescription] = useState(TEMPLATES[currentStatus]);
   const [formError, setFormError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [advance, setAdvance] = useState(true);
+
+  // Once the shipment's saved status catches up, the preview has done its job.
+  const [savedStatus, setSavedStatus] = useState(currentStatus);
+  if (savedStatus !== currentStatus) {
+    setSavedStatus(currentStatus);
+    setStatus(currentStatus);
+    setDescription(TEMPLATES[currentStatus]);
+  }
+  useEffect(() => {
+    previewOnMap({ id: shipmentId, status: null });
+  }, [currentStatus, shipmentId]);
+
+  const unsaved = advance && status !== currentStatus;
 
   // Local wall-clock time, formatted for a datetime-local input. Fixed at
   // mount so it still matches the input's default after a re-render.
@@ -123,6 +143,7 @@ export function TrackingEventForm({ shipmentId, currentStatus, currentLocation }
             const next = e.target.value as ShipmentStatus;
             setStatus(next);
             setDescription(TEMPLATES[next]);
+            if (advance) previewOnMap({ id: shipmentId, status: next });
           }}
           error={errors.status}
         >
@@ -143,6 +164,22 @@ export function TrackingEventForm({ shipmentId, currentStatus, currentLocation }
           error={errors.location}
         />
       </div>
+
+      {unsaved ? (
+        <p
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900"
+        >
+          <span>
+            <span className="font-semibold">Not saved yet.</span> The map is showing{" "}
+            {STATUS_LABELS[status]} as a preview — post the scan to change the shipment from{" "}
+            {STATUS_LABELS[currentStatus]}.
+          </span>
+          <Button type="submit" size="sm" loading={submitting}>
+            Save as {STATUS_LABELS[status]}
+          </Button>
+        </p>
+      ) : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Input
@@ -174,7 +211,11 @@ export function TrackingEventForm({ shipmentId, currentStatus, currentLocation }
         <input
           type="checkbox"
           name="sync_shipment"
-          defaultChecked
+          checked={advance}
+          onChange={(e) => {
+            setAdvance(e.target.checked);
+            previewOnMap({ id: shipmentId, status: e.target.checked ? status : null });
+          }}
           className="mt-0.5 size-4 rounded border-ink-400 text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         />
         <span className="text-sm text-ink-700">

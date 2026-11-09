@@ -126,6 +126,7 @@ export default async function AdminShipmentDetailPage({ params }: PageProps) {
             <ShipmentMap
               points={points}
               cargo={cargo}
+              previewId={shipment.id}
               className="rounded-none"
               heightClassName="h-64 sm:h-72"
             />

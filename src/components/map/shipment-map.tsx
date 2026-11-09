@@ -7,7 +7,8 @@ import { GoogleShipmentMap } from "./google-shipment-map";
 import { OpenShipmentMap } from "./open-shipment-map";
 import { googleMapsKey } from "@/lib/maps/google-loader";
 import { STATUS_LABELS } from "@/lib/utils/format";
-import { kmCovered } from "@/lib/utils/progress";
+import { isMoving, kmCovered } from "@/lib/utils/progress";
+import type { ShipmentStatus } from "@/types";
 import {
   MARKER_COLORS,
   cargoColorFor,
@@ -31,6 +32,20 @@ interface ShipmentMapProps {
   connect?: boolean;
   /** The package itself, drawn travelling the route. */
   cargo?: CargoOnRoute | null;
+  /**
+   * Lets a status form on the same page preview its unsaved status on the map.
+   * The form dispatches {@link STATUS_PREVIEW_EVENT} with this same id.
+   */
+  previewId?: string;
+}
+
+/** Window event a status form fires to preview an unsaved status on the map. */
+export const STATUS_PREVIEW_EVENT = "shipment-status-preview";
+
+export interface StatusPreviewDetail {
+  id: string;
+  /** null clears the preview. */
+  status: ShipmentStatus | null;
 }
 
 /**
@@ -44,21 +59,61 @@ interface ShipmentMapProps {
  * Each provider degrades to the next if it fails at runtime, so the page is
  * never left with an empty grey box.
  */
-export function ShipmentMap({ cargo = null, className, ...rest }: ShipmentMapProps) {
+export function ShipmentMap({
+  cargo = null,
+  className,
+  previewId,
+  ...rest
+}: ShipmentMapProps) {
+  const preview = useStatusPreview(previewId, cargo);
   /*
    * The page refreshes itself to pick up status changes, and every refresh
    * hands over new-but-equal objects. Holding them steady means the map is
    * rebuilt only when the shipment actually changed, not on every refresh.
    */
   const points = useStableValue(rest.points);
-  const stableCargo = useStableValue(cargo);
+  const stableCargo = useStableValue(preview ?? cargo);
 
   return (
     <div className="relative">
       <MapProvider {...rest} points={points} cargo={stableCargo} className={className} />
-      {stableCargo ? <CargoStatusBadge cargo={stableCargo} /> : null}
+      {stableCargo ? <CargoStatusBadge cargo={stableCargo} unsaved={Boolean(preview)} /> : null}
     </div>
   );
+}
+
+/**
+ * The cargo as it would be with the status a form on the page has selected but
+ * not yet saved, or null when there is nothing to preview.
+ *
+ * The preview starts its moving stretch now, exactly as the scan it stands for
+ * would, so the package does not leap ahead by the hours it spent pending.
+ */
+function useStatusPreview(
+  previewId: string | undefined,
+  cargo: CargoOnRoute | null,
+): CargoOnRoute | null {
+  const [selected, setSelected] = useState<{ status: ShipmentStatus; at: string } | null>(null);
+
+  useEffect(() => {
+    if (!previewId) return;
+    const onPreview = (event: Event) => {
+      const detail = (event as CustomEvent<StatusPreviewDetail>).detail;
+      if (detail?.id !== previewId) return;
+      setSelected(detail.status ? { status: detail.status, at: new Date().toISOString() } : null);
+    };
+    window.addEventListener(STATUS_PREVIEW_EVENT, onPreview);
+    return () => window.removeEventListener(STATUS_PREVIEW_EVENT, onPreview);
+  }, [previewId]);
+
+  if (!cargo || !selected || selected.status === cargo.status) return null;
+
+  return {
+    ...cargo,
+    status: selected.status,
+    moving: isMoving(selected.status),
+    scans: [...cargo.scans, { status: selected.status, at: selected.at }],
+  };
 }
 
 /** Returns the same reference for as long as the value is structurally equal. */
@@ -77,7 +132,7 @@ function useStableValue<T>(value: T): T {
  * real road speed a package set in transit a minute ago has moved a kilometre,
  * which looks exactly like standing still.
  */
-function CargoStatusBadge({ cargo }: { cargo: CargoOnRoute }) {
+function CargoStatusBadge({ cargo, unsaved }: { cargo: CargoOnRoute; unsaved?: boolean }) {
   const progress = useLiveCargoProgress(cargo);
   const covered = kmCovered(cargo.routeKm, progress);
   const total = Math.round(cargo.routeKm);
@@ -102,6 +157,11 @@ function CargoStatusBadge({ cargo }: { cargo: CargoOnRoute }) {
           style={{ background: cargoColorFor(cargo.status) }}
         />
         {STATUS_LABELS[cargo.status]}
+        {unsaved ? (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.625rem] tracking-normal text-amber-900">
+            Preview · not saved
+          </span>
+        ) : null}
       </p>
       <p className="mt-0.5 text-[0.6875rem] font-semibold text-ink-600">
         {detail}
