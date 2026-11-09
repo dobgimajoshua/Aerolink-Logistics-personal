@@ -136,6 +136,16 @@ function CargoStatusBadge({ cargo, unsaved }: { cargo: CargoOnRoute; unsaved?: b
   const progress = useLiveCargoProgress(cargo);
   const covered = kmCovered(cargo.routeKm, progress);
   const total = Math.round(cargo.routeKm);
+  const percent = Math.min(Math.max(progress, 0), 1) * 100;
+  const decimals = percentDecimals(cargo);
+  const live = cargo.moving && cargo.status !== "delivered" && total > 0;
+  // Moving, the distance is shown to the ten metres so it visibly counts up.
+  const coveredLabel = live
+    ? (cargo.routeKm * (percent / 100)).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : covered.toLocaleString();
 
   const detail =
     cargo.status === "delivered"
@@ -149,7 +159,7 @@ function CargoStatusBadge({ cargo, unsaved }: { cargo: CargoOnRoute; unsaved?: b
           : "Stopped";
 
   return (
-    <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-5rem)] rounded-lg bg-white/95 px-3 py-2 shadow-md backdrop-blur">
+    <div className="pointer-events-none absolute left-3 top-3 z-10 w-56 max-w-[calc(100%-5rem)] rounded-lg bg-white/95 px-3 py-2 shadow-md backdrop-blur">
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-ink-900">
         <span
           aria-hidden
@@ -165,10 +175,50 @@ function CargoStatusBadge({ cargo, unsaved }: { cargo: CargoOnRoute; unsaved?: b
       </p>
       <p className="mt-0.5 text-[0.6875rem] font-semibold text-ink-600">
         {detail}
-        {total > 0 ? ` · ${covered.toLocaleString()} of ${total.toLocaleString()} km` : ""}
+        {total > 0 ? ` · ${coveredLabel} of ${total.toLocaleString()} km` : ""}
       </p>
+      {total > 0 || cargo.status === "delivered" ? (
+        <div className="mt-1.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[0.625rem] font-bold uppercase tracking-[0.08em] text-ink-500">
+              Journey complete
+            </span>
+            <span
+              className="font-mono text-sm font-bold tabular-nums text-ink-900"
+              aria-live="off"
+            >
+              {percent.toFixed(decimals)}%
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Distance travelled"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(percent)}
+            className="relative mt-1 h-1.5 w-full overflow-hidden rounded-full bg-ink-100"
+          >
+            <div
+              className="h-full rounded-full transition-[width] duration-1000 ease-linear"
+              style={{ width: `${percent}%`, background: cargoColorFor(cargo.status) }}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/**
+ * Enough decimal places that a moving package's percentage changes about once
+ * a second. At 60 km/h on a 1,000 km route a second is 0.0017% of the journey,
+ * so a whole-number percentage would sit still for ten minutes at a time.
+ */
+function percentDecimals(cargo: CargoOnRoute): number {
+  if (cargo.status === "delivered" || !cargo.moving || cargo.routeKm <= 0) return 1;
+  const percentPerSecond = (cargo.speedKmh / 3600 / cargo.routeKm) * 100;
+  if (!(percentPerSecond > 0)) return 1;
+  return Math.min(Math.max(Math.ceil(-Math.log10(percentPerSecond)), 1), 5);
 }
 
 function MapProvider({
