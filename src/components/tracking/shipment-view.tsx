@@ -5,6 +5,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { InvoiceDocument } from "@/components/invoice/invoice-document";
 import { StatusHeader } from "./status-header";
 import { TrackingTimeline } from "./timeline";
+import { LiveRefresh } from "./live-refresh";
 import { ShipmentDetails } from "./shipment-details";
 import { ShipmentMap, type MapPoint } from "@/components/map/shipment-map";
 import { resolvePlace } from "@/lib/geo/resolve-place";
@@ -113,6 +114,7 @@ export async function ShipmentView({ shipment }: { shipment: ShipmentWithEvents 
 
   return (
     <div className="space-y-5">
+      <LiveRefresh />
       <StatusHeader shipment={shipment} />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">

@@ -6,8 +6,11 @@ import { cn } from "@/lib/utils/cn";
 import { GoogleShipmentMap } from "./google-shipment-map";
 import { OpenShipmentMap } from "./open-shipment-map";
 import { googleMapsKey } from "@/lib/maps/google-loader";
+import { STATUS_LABELS } from "@/lib/utils/format";
+import { kmCovered } from "@/lib/utils/progress";
 import {
   MARKER_COLORS,
+  cargoColorFor,
   MARKER_ICONS,
   MARKER_LABELS,
   escapeHtml,
@@ -41,7 +44,74 @@ interface ShipmentMapProps {
  * Each provider degrades to the next if it fails at runtime, so the page is
  * never left with an empty grey box.
  */
-export function ShipmentMap({
+export function ShipmentMap({ cargo = null, className, ...rest }: ShipmentMapProps) {
+  /*
+   * The page refreshes itself to pick up status changes, and every refresh
+   * hands over new-but-equal objects. Holding them steady means the map is
+   * rebuilt only when the shipment actually changed, not on every refresh.
+   */
+  const points = useStableValue(rest.points);
+  const stableCargo = useStableValue(cargo);
+
+  return (
+    <div className="relative">
+      <MapProvider {...rest} points={points} cargo={stableCargo} className={className} />
+      {stableCargo ? <CargoStatusBadge cargo={stableCargo} /> : null}
+    </div>
+  );
+}
+
+/** Returns the same reference for as long as the value is structurally equal. */
+function useStableValue<T>(value: T): T {
+  const key = JSON.stringify(value);
+  const [held, setHeld] = useState({ key, value });
+  if (held.key !== key) {
+    setHeld({ key, value });
+    return value;
+  }
+  return held.value;
+}
+
+/**
+ * Says what the package is doing. Its position cannot say it on its own: at a
+ * real road speed a package set in transit a minute ago has moved a kilometre,
+ * which looks exactly like standing still.
+ */
+function CargoStatusBadge({ cargo }: { cargo: CargoOnRoute }) {
+  const progress = useLiveCargoProgress(cargo);
+  const covered = kmCovered(cargo.routeKm, progress);
+  const total = Math.round(cargo.routeKm);
+
+  const detail =
+    cargo.status === "delivered"
+      ? "Arrived at destination"
+      : cargo.moving
+        ? `Moving · ${Math.round(cargo.speedKmh)} km/h`
+        : cargo.status === "pending"
+          ? covered > 0
+            ? "Stopped · awaiting dispatch"
+            : "Awaiting pickup"
+          : "Stopped";
+
+  return (
+    <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-5rem)] rounded-lg bg-white/95 px-3 py-2 shadow-md backdrop-blur">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-ink-900">
+        <span
+          aria-hidden
+          className={cn("size-2.5 shrink-0 rounded-full", cargo.moving && "animate-pulse")}
+          style={{ background: cargoColorFor(cargo.status) }}
+        />
+        {STATUS_LABELS[cargo.status]}
+      </p>
+      <p className="mt-0.5 text-[0.6875rem] font-semibold text-ink-600">
+        {detail}
+        {total > 0 ? ` · ${covered.toLocaleString()} of ${total.toLocaleString()} km` : ""}
+      </p>
+    </div>
+  );
+}
+
+function MapProvider({
   points,
   className,
   heightClassName = "h-72 sm:h-96 lg:h-[28rem]",
@@ -307,7 +377,13 @@ function SchematicMap({
             );
             return (
               <g>
-                <circle cx={at.lng} cy={at.lat} r="21" fill="#fb5c11" fillOpacity="0.18">
+                <circle
+                  cx={at.lng}
+                  cy={at.lat}
+                  r="21"
+                  fill={cargoColorFor(cargo.status)}
+                  fillOpacity="0.18"
+                >
                   {cargo.moving ? (
                     <animate
                       attributeName="r"
@@ -321,7 +397,7 @@ function SchematicMap({
                   cx={at.lng}
                   cy={at.lat}
                   r="13"
-                  fill="#fb5c11"
+                  fill={cargoColorFor(cargo.status)}
                   stroke="#fff"
                   strokeWidth="3"
                 />

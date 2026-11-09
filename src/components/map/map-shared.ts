@@ -63,6 +63,26 @@ export interface CargoOnRoute {
 }
 
 /**
+ * The cargo marker's colour for each status, so a status change is visible on
+ * the map at a glance. Position alone cannot show it: at 60 km/h a package that
+ * has just been set in transit is still a few metres from where it stood.
+ */
+export const CARGO_STATUS_COLORS: Record<ShipmentStatus, string> = {
+  pending: "#6a7688",
+  picked_up: "#fb5c11",
+  in_transit: "#fb5c11",
+  out_for_delivery: "#fb5c11",
+  customs: "#7c3aed",
+  delayed: "#d97706",
+  exception: "#dc2626",
+  delivered: "#16a34a",
+};
+
+export function cargoColorFor(status: ShipmentStatus): string {
+  return CARGO_STATUS_COLORS[status] ?? CARGO_STATUS_COLORS.in_transit;
+}
+
+/**
  * The DOM node that travels the route. An uploaded photo is used when there is
  * one; otherwise the vehicle glyph. Built as raw DOM because both map
  * providers take elements, not React nodes.
@@ -75,7 +95,7 @@ export function cargoMarkerElement(cargo: CargoOnRoute): HTMLElement {
     "height:46px",
     "border-radius:9999px",
     "border:3px solid #ffffff",
-    "background:#fb5c11",
+    `background:${cargoColorFor(cargo.status)}`,
     "box-shadow:0 4px 14px rgba(11,14,20,.45)",
     "display:flex",
     "align-items:center",
